@@ -1,4 +1,9 @@
 import pandas as pd
+import matplotlib.pyplot as plt
+from pathlib import Path
+import PIL
+
+HATE_IMAGES = Path('/home/jupyter/mmf_data/datasets/hateful_memes/defaults/images')
 
 def gen_submit(learn, path, fname):
     test_df = pd.read_json(path/'test.jsonl', lines=True)
@@ -12,3 +17,20 @@ def gen_submit(learn, path, fname):
     submit_df['label'] = indcs
     submit_df = submit_df.set_index('id')
     submit_df.to_csv(fname, header=True)
+    
+def find_like(s, data):
+    return data[data.text.str.contains(s, case=False)]
+
+def by_ids(ids, data):
+    return data[data.id.isin(ids)]
+
+def show(data):
+    n = min(len(data), 40)
+    _,axs = plt.subplots((n+1)//2,2, figsize=(20,2*n))
+    for ax, (_,row) in zip(axs.flatten(), data.iterrows()):
+        img_path = HATE_IMAGES / row['img']
+        ax.imshow(PIL.Image.open(img_path))
+        ax.axis('off')
+        clr = 'red' if row['label']==1 else 'green'
+        txt = f'{row["id"]}: {row["tex_cap"][:80]}'
+        ax.set_title(txt, color=clr) 

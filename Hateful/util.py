@@ -2,13 +2,16 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from pathlib import Path
 import PIL
+import torch.nn.functional as F
 
 HATE_IMAGES = Path('/home/jupyter/mmf_data/datasets/hateful_memes/defaults/images')
-
-def gen_submit(learn, path, fname):
-    test_df = pd.read_json(path/'test.jsonl', lines=True)
+HATE_ANNOT = Path('/home/jupyter/mmf_data/datasets/hateful_memes/defaults/annotations/')
+def gen_submit(learn, fname, softmax=False):
+    test_df = pd.read_json(HATE_ANNOT/'test.jsonl', lines=True)
     test_dl = learn.dls.test_dl(test_df)
     preds = learn.get_preds(dl=test_dl)[0]
+    if softmax:
+        preds = F.softmax(preds)
     _, indcs = preds.max(dim=1)
     probs= preds[:,1]
     submit_df = pd.DataFrame()

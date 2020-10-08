@@ -11,20 +11,20 @@ import numpy as np
 import fastprogress
 from fastai.callback.all import *
 from fastcore.utils import *
-
+from fastcore.foundation import *
 HATE_PATH = Path('/home/jupyter/mmf_data/datasets/hateful_memes/defaults/')
 HATE_IMAGES = HATE_PATH/'images'
 HATE_ANNOT = HATE_PATH/'annotations'
 HATE_FEAT_PATH = Path('/home/jupyter/hateful_features/region_feat_gvd_wo_bgd')
-
+PHASE_2 = Path('/home/jupyter/hate_phase2')
 class VLPInput(tuple):pass
 
 def gen_submit(learn, fname, softmax=False):
-    test_df = pd.read_json(HATE_ANNOT/'test.jsonl', lines=True)
+    test_df = pd.read_json(PHASE_2/'test_seen.jsonl', lines=True)
     test_dl = learn.dls.test_dl(test_df)
     preds = learn.get_preds(dl=test_dl)[0]
     if softmax:
-        preds = F.softmax(preds)
+        preds = F.softmax(preds, dim=1)
     _, indcs = preds.max(dim=1)
     probs= preds[:,1]
     submit_df = pd.DataFrame()

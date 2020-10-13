@@ -17,6 +17,7 @@ HATE_IMAGES = HATE_PATH/'images'
 HATE_ANNOT = HATE_PATH/'annotations'
 HATE_FEAT_PATH = Path('/home/jupyter/hateful_features/region_feat_gvd_wo_bgd')
 PHASE_2 = Path('/home/jupyter/hate_phase2')
+
 class VLPInput(tuple):pass
 
 def gen_submit(learn, fname, softmax=False):
@@ -37,7 +38,7 @@ def gen_submit(learn, fname, softmax=False):
     
 def id_to_img_path(id):
     id = f'{int(id):05d}'
-    return str(HATE_PATH/f'images/img/{id}.png')
+    return str(PHASE_2/f'img/{id}.png')
 
 def id_to_text(id, data):
     return first(data[data.id==id].text)
@@ -65,7 +66,7 @@ def show(data):
     n = min(len(data), 40)
     _,axs = plt.subplots((n+1)//2,2, figsize=(20,2*n))
     for ax, (_,row) in zip(axs.flatten(), data.iterrows()):
-        img_path = HATE_IMAGES / row['img']
+        img_path = id_to_img_path(row['id'])
         ax.imshow(PIL.Image.open(img_path))
         ax.axis('off')
         clr = 'red' if row['label']==1 else 'green'

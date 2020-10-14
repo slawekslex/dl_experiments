@@ -20,8 +20,8 @@ PHASE_2 = Path('/home/jupyter/hate_phase2')
 
 class VLPInput(tuple):pass
 
-def gen_submit(learn, fname, softmax=False):
-    test_df = pd.read_json(PHASE_2/'test_seen.jsonl', lines=True)
+def gen_submit(learn, fname, softmax=False, test_file = 'test_seen.jsonl'):
+    test_df = pd.read_json(PHASE_2/test_file, lines=True)
     test_dl = learn.dls.test_dl(test_df)
     preds = learn.get_preds(dl=test_dl)[0]
     if softmax:

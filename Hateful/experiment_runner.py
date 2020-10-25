@@ -5,23 +5,23 @@ import random
 
 def draw_hypers():
     hypers=dict()
-    hypers['max_tgt_length'] = random.randint(10,100)
-    hypers['head_ps'] = random.uniform(0,.80)
-    hypers['stem_ps'] = random.uniform(0,.50)
-    hypers['head_linear'] = random.randint(50, 1024)
-    hypers['max_masked'] = random.randint(0, hypers['max_tgt_length'])
+    hypers['max_tgt_length'] = random.randint(70,100)
+    hypers['head_ps'] = random.uniform(0.5,.80)
+    hypers['stem_ps'] = random.uniform(0.2,.30)
+    hypers['head_linear'] = random.randint(400, 600)
+    hypers['max_masked'] = random.randint(0, hypers['max_tgt_length'] //3)
     hypers['mask_prob'] = random.uniform(0, .30)
-    hypers['vis_mask_prob'] = random.uniform(0, .30)
-    hypers['lr'] = random.uniform(0.001 / 5, 0.001 * 5)
-    hypers['lr_mult'] = random.randint(2, 50)
-    hypers['train_epochs'] = random.randint(6, 12)
+    hypers['vis_mask_prob'] = random.uniform(0.1, .30)
+    hypers['lr'] = random.uniform(0.0002, 0.002)
+    hypers['lr_mult'] = random.uniform(lr/3e-5, lr/1.5e-5)
+    hypers['train_epochs'] = 8#random.randint(6, 12)
     return hypers
     
     
 
 
-for exp_id in range(2, 40):
-    print('============= exp', exp_id, '\n')
+for exp_id in range(40, 100):
+    print('============= exp', exp_id, '\n', flush=True)
     hypers = draw_hypers()    
     com = ['python', 'run_experiment.py', f'--experiment_id={exp_id}']
     for name,value in hypers.items():

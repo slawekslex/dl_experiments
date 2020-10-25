@@ -9,9 +9,13 @@ import subprocess
 import matplotlib.pyplot as plt
 import numpy as np
 import fastprogress
+import sys
 from fastai.callback.all import *
 from fastcore.utils import *
 from fastcore.foundation import *
+sys.path.insert(0, '/home/jupyter/VLP/')
+from pytorch_pretrained_bert.tokenization import BertTokenizer
+
 HATE_PATH = Path('/home/jupyter/mmf_data/datasets/hateful_memes/defaults/')
 HATE_IMAGES = HATE_PATH/'images'
 HATE_ANNOT = HATE_PATH/'annotations'
@@ -75,4 +79,56 @@ def show(data):
         
         import select
 
-
+common_words = [
+    (['muslim'], ''),
+    (['omar', 'ilhan', 'mohammed', 'ahmed', 'tlaib', 'mohammad', 'rashida'], 'muslim name'),
+    (['trump', 'donald'], 'donald trump'),
+    (['islam', 'allah', 'sharia'], 'islam'),
+    (['jew'], ''),
+    (['anne','frank'], 'jew girl name'),
+    (['america', 'usa'], 'america'),
+    (['tranny'], ''),
+    (['obama'], 'black name'),
+    (['michelle', 'barack'], 'obama black name'),
+    (['hitler'],'german name killer'),
+    (['isis'], 'muslim terrorist'),
+    (['polish'],''),
+    (['democrat'],''),
+    (['liberal'], ''),
+    (['republican'], ''),
+    (['christian'], ''),
+    (['nazi'],'german killer'),
+    (['meme'],''),
+    (['mexican'],''),
+    (['jesus'],''),
+    (['africa',],''),
+    (['porn'],''),
+    (['walmart'],''),
+    (['retarded'],'stupid curse'),
+    (['auschwitz', 'holocaust'],'jew death'),
+    (['pussy'],''),
+    (['chinese', 'asian'], 'asia'),
+    (['hillary', 'clinton'],'woman name'),
+    (['jenner'],'trans name'),
+    (['gorilla', 'apes'],'monkey'),
+    (['christchurch'],'muslim death'),
+    (['hijab'],'muslim wear'),
+    (['hump'],'fuck'),
+    (['kfc'],'restaurant'),
+    (['pic'], ''),
+    (['diaper'],''),
+    (['lol'],''),
+    (['bro'],''),
+    (['nigger'],'black curse'),
+    (['tyrone'],'black name'),
+    (['israel'], 'jew country'),
+    ]
+def get_tokenizer(with_replace=False):
+    tokenizer = BertTokenizer.from_pretrained('bert-base-cased', do_lower_case=True)
+    if with_replace:
+        cur_idx = 12
+        for awords, bwords in common_words:
+            for word in awords:
+                tokenizer.vocab[word] = cur_idx 
+                cur_idx +=1
+    return tokenizer

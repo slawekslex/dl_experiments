@@ -110,7 +110,7 @@ def main():
     parser.add_argument("--mask_prob", default=.2, type=float, help='token mask prob')
     parser.add_argument("--vis_mask_prob", default=.2, type=float, help='img mask prob')
     parser.add_argument("--lr", default=0.001, type=float, help='initial learning rate for head')
-    parser.add_argument("--lr_mult", default=10, type=int, help='difference in lr per split')
+    parser.add_argument("--lr_mult", default=10, type=float, help='difference in lr per split')
     parser.add_argument("--train_epochs", default=8, type=int, help='number of training epochs')
     
     global args

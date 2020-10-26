@@ -74,7 +74,7 @@ def create_head(nf, n_out, lin_ftrs=None, ps=0.5, bn_final=False, lin_first=Fals
     return nn.Sequential(*layers)
     
 def new_model():
-    hate_stem = torch.load('checkpoints/lm_stem20drop_p2.pth')
+    hate_stem = torch.load(args.stem_file)
     stem_modules = list(hate_stem.modules())
     dropouts = [x for x in stem_modules if isinstance(x, torch.nn.modules.dropout.Dropout)]
     for x in dropouts: x.p = args.stem_ps
@@ -112,6 +112,7 @@ def main():
     parser.add_argument("--lr", default=0.001, type=float, help='initial learning rate for head')
     parser.add_argument("--lr_mult", default=10, type=float, help='difference in lr per split')
     parser.add_argument("--train_epochs", default=8, type=int, help='number of training epochs')
+    parser.add_argument("--stem_file", type=str, help='pretreined model path')
     
     global args
     args = parser.parse_args()

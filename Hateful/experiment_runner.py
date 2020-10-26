@@ -13,14 +13,15 @@ def draw_hypers():
     hypers['mask_prob'] = random.uniform(0, .30)
     hypers['vis_mask_prob'] = random.uniform(0.1, .30)
     hypers['lr'] = random.uniform(0.0002, 0.002)
-    hypers['lr_mult'] = random.uniform(lr/3e-5, lr/1.5e-5)
+    hypers['lr_mult'] = random.uniform(hypers['lr']/3e-5, hypers['lr']/1.5e-5)
     hypers['train_epochs'] = 8#random.randint(6, 12)
+    hypers['stem_file'] = 'checkpoints/lm_stem_long.pth'
     return hypers
     
     
 
 
-for exp_id in range(40, 100):
+for exp_id in range(78, 120):
     print('============= exp', exp_id, '\n', flush=True)
     hypers = draw_hypers()    
     com = ['python', 'run_experiment.py', f'--experiment_id={exp_id}']

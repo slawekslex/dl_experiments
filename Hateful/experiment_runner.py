@@ -16,12 +16,13 @@ def draw_hypers():
     hypers['lr_mult'] = random.uniform(hypers['lr']/3e-5, hypers['lr']/1.5e-5)
     hypers['train_epochs'] = 8#random.randint(6, 12)
     hypers['stem_file'] = 'checkpoints/lm_stem_long.pth'
+    hypers['mixup_alpha'] = random.uniform(0.2, 0.6)
     return hypers
     
     
 
 
-for exp_id in range(78, 120):
+for exp_id in range(150, 200):
     print('============= exp', exp_id, '\n', flush=True)
     hypers = draw_hypers()    
     com = ['python', 'run_experiment.py', f'--experiment_id={exp_id}']

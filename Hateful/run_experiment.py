@@ -11,6 +11,7 @@ import argparse
 sys.path.insert(0, '/home/jupyter/VLP/pythia')
 sys.path.insert(0, '/home/jupyter/VLP/')
 
+from torch.distributions.beta import Beta
 from pytorch_pretrained_bert.tokenization import BertTokenizer
 from pytorch_pretrained_bert.modeling import BertForPreTrainingLossMask
 from pytorch_pretrained_bert.optimization import BertAdam
@@ -53,9 +54,12 @@ class HateClassifier(torch.nn.Module):
         super(HateClassifier, self).__init__()
         self.stem = stem
         self.classifier = create_head(768,2, lin_ftrs=[args.head_linear], ps=args.head_ps)
-    def forward(self, params):  
+    def forward(self, params, lam=None, shuffle=None):  
         id, vis_feats, vis_pe, input_ids, token_type_ids, attention_mask = params
         embs = self.stem(vis_feats, vis_pe, input_ids, token_type_ids, attention_mask)
+        if lam is not None:
+            embs2 = embs[shuffle]
+            embs = torch.lerp(embs2, embs, lam)
         return self.classifier(embs)
         
 def create_head(nf, n_out, lin_ftrs=None, ps=0.5, bn_final=False, lin_first=False, ):
@@ -97,6 +101,32 @@ def vlp_splitter(model):
             params(model.stem.bert),
             params(model.classifier))
 
+class MixUp(Callback):
+    run_after,run_valid = [Normalize],False
+    def __init__(self, alpha=0.4): self.distrib = Beta(tensor(alpha), tensor(alpha))
+    def before_fit(self):
+        self.stack_y = getattr(self.learn.loss_func, 'y_int', False)
+        if self.stack_y: self.old_lf,self.learn.loss_func = self.learn.loss_func,self.lf
+
+    def after_fit(self):
+        if self.stack_y: self.learn.loss_func = self.old_lf
+
+    def before_batch(self):        
+        lam = self.distrib.sample((self.y.size(0),)).squeeze().cuda()
+        lam = torch.stack([lam, 1-lam], 1)
+        self.lam = lam.max(1)[0]
+        shuffle = torch.randperm(self.y.size(0)).cuda()
+        xb, yb = self.learn.xb[0], self.learn.yb[0]
+        self.yb1 = (yb[shuffle],)
+        self.learn.xb =self.xb+ (self.lam.unsqueeze(1), shuffle)
+        
+
+    def lf(self, pred, *yb):
+        if not self.training: return self.old_lf(pred, *yb)
+        with NoneReduce(self.old_lf) as lf:
+            loss = torch.lerp(lf(pred,*self.yb1), lf(pred,*yb), self.lam)
+        return reduce_loss(loss, getattr(self.old_lf, 'reduction', 'mean'))
+    
 def main():
     parser = argparse.ArgumentParser()
 
@@ -112,6 +142,7 @@ def main():
     parser.add_argument("--lr", default=0.001, type=float, help='initial learning rate for head')
     parser.add_argument("--lr_mult", default=10, type=float, help='difference in lr per split')
     parser.add_argument("--train_epochs", default=8, type=int, help='number of training epochs')
+    parser.add_argument("--mixup_alpha", default=0.4, type=int, help='number of training epochs')
     parser.add_argument("--stem_file", type=str, help='pretreined model path')
     
     global args
@@ -168,13 +199,13 @@ def main():
     db = DataBlock(blocks = (TransformBlock, CategoryBlock), 
                get_x = Pipeline([LoadRow(0, train_proc, tokenizer),LoadRow(1, val_proc, tokenizer)]), 
                get_y=get_y,  splitter=ColSplitter('is_valid'))
-    dls = db.dataloaders(data,bs=64)
+    dls = db.dataloaders(data,bs=48)
     
     print(len(dls.train_ds), len(dls.valid_ds))
     roc_tracker = TrackerCallback(monitor='roc_auc_score', comp=np.greater)
     acc_tracker = TrackerCallback(monitor='accuracy', comp=np.greater)
     model = new_model()
-    learn = Learner(dls, model,metrics=[accuracy, RocAucBinary()], cbs=[roc_tracker, acc_tracker], splitter=vlp_splitter).to_fp16()
+    learn = Learner(dls, model,metrics=[accuracy, RocAucBinary()], cbs=[roc_tracker, acc_tracker, MixUp(args.mixup_alpha)], splitter=vlp_splitter)
     
     learn.fine_tune(args.train_epochs, args.lr, lr_mult=args.lr_mult)
     print('best:', roc_tracker.best, acc_tracker.best)

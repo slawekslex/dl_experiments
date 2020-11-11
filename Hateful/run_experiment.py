@@ -101,31 +101,6 @@ def vlp_splitter(model):
             params(model.stem.bert),
             params(model.classifier))
 
-class MixUp(Callback):
-    run_after,run_valid = [Normalize],False
-    def __init__(self, alpha=0.4): self.distrib = Beta(tensor(alpha), tensor(alpha))
-    def before_fit(self):
-        self.stack_y = getattr(self.learn.loss_func, 'y_int', False)
-        if self.stack_y: self.old_lf,self.learn.loss_func = self.learn.loss_func,self.lf
-
-    def after_fit(self):
-        if self.stack_y: self.learn.loss_func = self.old_lf
-
-    def before_batch(self):        
-        lam = self.distrib.sample((self.y.size(0),)).squeeze().cuda()
-        lam = torch.stack([lam, 1-lam], 1)
-        self.lam = lam.max(1)[0]
-        shuffle = torch.randperm(self.y.size(0)).cuda()
-        xb, yb = self.learn.xb[0], self.learn.yb[0]
-        self.yb1 = (yb[shuffle],)
-        self.learn.xb =self.xb+ (self.lam.unsqueeze(1), shuffle)
-        
-
-    def lf(self, pred, *yb):
-        if not self.training: return self.old_lf(pred, *yb)
-        with NoneReduce(self.old_lf) as lf:
-            loss = torch.lerp(lf(pred,*self.yb1), lf(pred,*yb), self.lam)
-        return reduce_loss(loss, getattr(self.old_lf, 'reduction', 'mean'))
     
 def main():
     parser = argparse.ArgumentParser()
@@ -142,9 +117,9 @@ def main():
     parser.add_argument("--lr", default=0.001, type=float, help='initial learning rate for head')
     parser.add_argument("--lr_mult", default=10, type=float, help='difference in lr per split')
     parser.add_argument("--train_epochs", default=8, type=int, help='number of training epochs')
-    parser.add_argument("--mixup_alpha", default=0.4, type=int, help='number of training epochs')
+    parser.add_argument("--mixup_alpha", default=0.4, type=float, help='number of training epochs')
     parser.add_argument("--stem_file", type=str, help='pretreined model path')
-    
+    parser.add_argument('--run_without_valid', dest='run_without_valid', action='store_true')
     global args
     args = parser.parse_args()
     print(args)
@@ -166,10 +141,16 @@ def main():
     dev_unseen = pd.read_json(PHASE_2/'dev_unseen.jsonl', lines=True)#[:64]
     test_seen = pd.read_json(PHASE_2/'test_seen.jsonl', lines=True)
     test_unseen = pd.read_json(PHASE_2/'test_unseen.jsonl', lines=True)
-    train['is_valid'] = False
-    dev_seen['is_valid'] = True
-    dev_unseen['is_valid']=True
-    data = pd.concat([train, dev_seen, dev_unseen])
+    if args.run_without_valid:
+        data = pd.concat([train, dev_seen, dev_unseen])
+        data['is_valid']=False
+        dev_unseen['is_valid']=True
+        data = pd.concat([data,dev_unseen])
+    else:
+        train['is_valid'] = False
+        dev_seen['is_valid'] = True
+        dev_unseen['is_valid']=True
+        data = pd.concat([train, dev_seen, dev_unseen])
     
     
     region_pref = HATE_FEAT_PATH / 'feat_cls_1000/hateful_vlp_checkpoint_trainval'
@@ -199,20 +180,26 @@ def main():
     db = DataBlock(blocks = (TransformBlock, CategoryBlock), 
                get_x = Pipeline([LoadRow(0, train_proc, tokenizer),LoadRow(1, val_proc, tokenizer)]), 
                get_y=get_y,  splitter=ColSplitter('is_valid'))
-    dls = db.dataloaders(data,bs=48)
+    dls = db.dataloaders(data,bs=64)
     
     print(len(dls.train_ds), len(dls.valid_ds))
     roc_tracker = TrackerCallback(monitor='roc_auc_score', comp=np.greater)
     acc_tracker = TrackerCallback(monitor='accuracy', comp=np.greater)
     model = new_model()
-    learn = Learner(dls, model,metrics=[accuracy, RocAucBinary()], cbs=[roc_tracker, acc_tracker, MixUp(args.mixup_alpha)], splitter=vlp_splitter)
+    learn = Learner(dls, model,metrics=[accuracy, RocAucBinary()], cbs=[roc_tracker, acc_tracker], splitter=vlp_splitter).to_fp16()
     
     learn.fine_tune(args.train_epochs, args.lr, lr_mult=args.lr_mult)
     print('best:', roc_tracker.best, acc_tracker.best)
     
-    exp_res = pd.read_csv('exp_results.csv')
-    row = pd.DataFrame([{'id':args.experiment_id, 'hypers':str(args), 'roc':roc_tracker.best, 'acc':acc_tracker.best}])
-    exp_res = exp_res.append(row)
-    exp_res.to_csv('exp_results.csv', index=False)
+    
+    if args.run_without_valid:
+        gen_submit(learn, f'attempts/attempt_exp{args.experiment_id}.csv', True)
+        gen_submit(learn, f'attempts/phase2_exp{args.experiment_id}.csv', softmax=True, test_file='test_unseen.jsonl')
+    else:
+        exp_res = pd.read_csv('exp_results.csv')
+        row = pd.DataFrame([{'id':args.experiment_id, 'hypers':str(args), 'roc':roc_tracker.best, 'acc':acc_tracker.best}])
+        exp_res = exp_res.append(row)
+        exp_res.to_csv('exp_results.csv', index=False)
+        
 if __name__ == '__main__':
     main()
